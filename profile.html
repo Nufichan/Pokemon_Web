@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Profile</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: Arial;
+      background: #111;
+      color: white;
+      padding: 30px;
+    }
+    .card {
+      background: #1e1e1e;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+    input, button {
+      padding: 8px;
+      margin-top: 10px;
+    }
+    button {
+      background: #4caf50;
+      border: none;
+      color: white;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h2>Profile</h2>
+  <p><strong>Username:</strong> <span id="username"></span></p>
+  <p><strong>Email:</strong> <span id="email"></span></p>
+  <button onclick="logout()">Logout</button>
+</div>
+
+<div class="card">
+  <h3>Add Friend</h3>
+  <input type="text" id="friendUsername" placeholder="Friend username">
+  <button onclick="addFriend()">Add Friend</button>
+</div>
+
+<div class="card">
+  <h3>Your Friends</h3>
+  <ul id="friendsList"></ul>
+</div>
+
+<script>
+  const supabase = window.supabase.createClient(
+    "https://gcyldbjjnpntksaohgsf.supabase.co",
+    "sb_publishable_VPLQbBSHMZZtcrNZNiSC-A_0zp3l6Uo"
+  );
+
+  let currentUser;
+
+  async function init() {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      window.location.href = "login.html";
+      return;
+    }
+
+    currentUser = user;
+
+    document.getElementById("email").innerText = user.email;
+
+    const { data: profile } = await supabase
+      .from("users")
+      .select("username")
+      .eq("id", user.id)
+      .single();
+
+    document.getElementById("username").innerText = profile.username;
+
+    loadFriends();
+  }
+
+  async function loadFriends() {
+    const { data: friends } = await supabase
+      .from("friends")
+      .select("friend_id")
+      .eq("user_id", currentUser.id);
+
+    const friendIds = friends.map(f => f.friend_id);
+
+    if (friendIds.length === 0) return;
+
+    const { data: users } = await supabase
+      .from("users")
+      .select("username")
+      .in("id", friendIds);
+
+    const list = document.getElementById("friendsList");
+    list.innerHTML = "";
+
+    users.forEach(u => {
+      const li = document.createElement("li");
+      li.innerText = u.username;
+      list.appendChild(li);
+    });
+  }
+
+  async function addFriend() {
+    const friendUsername = document.getElementById("friendUsername").value;
+
+    const { data: user } = await supabase
+      .from("users")
+      .select("id")
+      .eq("username", friendUsername)
+      .single();
+
+    if (!user) {
+      alert("User not found");
+      return;
+    }
+
+    await supabase.from("friends").insert({
+      user_id: currentUser.id,
+      friend_id: user.id
+    });
+
+    loadFriends();
+  }
+
+  async function logout() {
+    await supabase.auth.signOut();
+    window.location.href = "login.html";
+  }
+
+  init();
+</script>
+
+</body>
+</html>
